@@ -44,12 +44,24 @@ def create_pawn(
 
 @router.get("/pawn/all_client", response_model=ResponseModel)
 def get_all_client_pawn(
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(10, ge=1, le=100, description="Items per page"),
+    search_name: str = Query("", description="Search by customer name"),
+    search_phone: str = Query("", description="Search by phone number"),
+    search_address: str = Query("", description="Search by address"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
     staff.is_staff(current_user)
-    return staff.get_all_client_pawn(db)
-
+    return staff.get_all_client_pawn(
+        db, 
+        page=page, 
+        limit=limit, 
+        search_name=search_name,
+        search_phone=search_phone,
+        search_address=search_address
+    )
+    
 @router.get("/pawn/client/{cus_id}", response_model=ResponseModel)
 def get_client_id(
     cus_id: int,

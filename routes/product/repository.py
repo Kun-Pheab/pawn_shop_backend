@@ -3,12 +3,13 @@ from routes.user.model import *
 from sqlalchemy.orm import Session
 from entities import *
 from response_model import ResponseModel
-from typing import List, Dict
+from typing import List, Dict, Optional
 # from app.models import Client, Pawn
 from sqlalchemy.sql import func, or_, and_
 from sqlalchemy.exc import SQLAlchemyError
 from collections import defaultdict
 from typing import Dict, Any
+import math
 
 class Staff:
     def is_staff(self, current_user: dict):
@@ -24,7 +25,7 @@ class Staff:
             if existing_product:
                 raise HTTPException(
                     status_code=400,
-                    detail="ផលិតផលមានរួចហើយ",
+                    detail="Product already exists",
                 )
                 
             if product_info.amount != None and product_info.unit_price != None:
@@ -48,31 +49,141 @@ class Staff:
             return ResponseModel(
                 code=200,
                 status="Success",
-                message="ការបញ្ជាទិញត្រូវបានជោគជ័យ"
+                message="Product created successfully"
             )
             
-    # ========== Get ALl Product ==========
-    def get_product(self, db: Session):
-            products = db.query(Product).all()
-            if not products:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Products not found",
-                )
-            serialized_products = [
-                {
-                    "id": product.prod_id,
-                    "name": product.prod_name,
-                    "price": product.unit_price,
-                    "amount": product.amount,
+    # ========== Get All Products with Pagination and Search ==========
+    def get_product(self, db: Session, page: int = 1, limit: int = 10, search: Optional[str] = None):
+        # Calculate offset for pagination
+        offset = (page - 1) * limit
+        
+        # Base query
+        query = db.query(Product)
+        
+        # Add search filter if provided
+        if search:
+            search_filter = or_(
+                Product.prod_name.ilike(f"%{search}%"),
+                # You can add more fields to search in if needed
+                # Product.description.ilike(f"%{search}%")
+            )
+            query = query.filter(search_filter)
+        
+        # Get total count for pagination info
+        total_count = query.count()
+        
+        # Apply pagination
+        products = query.offset(offset).limit(limit).all()
+        
+        if not products and page > 1:
+            raise HTTPException(
+                status_code=404,
+                detail="No products found on this page",
+            )
+        
+        # Calculate pagination info
+        total_pages = math.ceil(total_count / limit) if total_count > 0 else 1
+        has_next = page < total_pages
+        has_prev = page > 1
+        
+        serialized_products = [
+            {
+                "id": product.prod_id,
+                "name": product.prod_name,
+                "price": product.unit_price,
+                "amount": product.amount,
+            }
+            for product in products
+        ]
+        
+        return ResponseModel(
+            code=200,
+            status="Success",
+            result={
+                "products": serialized_products,
+                "pagination": {
+                    "current_page": page,
+                    "total_pages": total_pages,
+                    "total_count": total_count,
+                    "limit": limit,
+                    "has_next": has_next,
+                    "has_prev": has_prev
                 }
-                for product in products
-            ]
+            }
+        )
+    
+    # ========== Search Products ==========
+    def search_products(self, db: Session, search_term: str, page: int = 1, limit: int = 10):
+        """
+        Search products by name with pagination
+        """
+        if not search_term.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Search term cannot be empty"
+            )
+        
+        # Calculate offset
+        offset = (page - 1) * limit
+        
+        # Search query
+        search_filter = Product.prod_name.ilike(f"%{search_term}%")
+        
+        # Get total count
+        total_count = db.query(Product).filter(search_filter).count()
+        
+        # Get products with pagination
+        products = db.query(Product).filter(search_filter).offset(offset).limit(limit).all()
+        
+        if not products:
             return ResponseModel(
                 code=200,
                 status="Success",
-                result=serialized_products
+                result={
+                    "products": [],
+                    "pagination": {
+                        "current_page": page,
+                        "total_pages": 0,
+                        "total_count": 0,
+                        "limit": limit,
+                        "has_next": False,
+                        "has_prev": False
+                    }
+                },
+                message="No products found matching your search"
             )
+        
+        # Calculate pagination info
+        total_pages = math.ceil(total_count / limit)
+        has_next = page < total_pages
+        has_prev = page > 1
+        
+        serialized_products = [
+            {
+                "id": product.prod_id,
+                "name": product.prod_name,
+                "price": product.unit_price,
+                "amount": product.amount,
+            }
+            for product in products
+        ]
+        
+        return ResponseModel(
+            code=200,
+            status="Success",
+            result={
+                "products": serialized_products,
+                "pagination": {
+                    "current_page": page,
+                    "total_pages": total_pages,
+                    "total_count": total_count,
+                    "limit": limit,
+                    "has_next": has_next,
+                    "has_prev": has_prev
+                }
+            },
+            message=f"Found {total_count} products matching '{search_term}'"
+        )
         
     # ========== Update Existing Product ==========
     def update_product(

@@ -1,3 +1,4 @@
+import math
 from fastapi import HTTPException
 from routes.user.model import *
 from sqlalchemy.orm import Session
@@ -37,7 +38,7 @@ class Staff:
                     cus_name=client_info.cus_name,
                     address=client_info.address,
                     phone_number=client_info.phone_number,
-                    role='user'  # Ensure role is set
+                    role='user'  
                 )
                 db.add(client)
                 db.commit()
@@ -318,26 +319,91 @@ class Staff:
 
         return list(grouped_orders.values())  # Return all orders
 
-    def get_all_client_order(self, db: Session):
-        clients_with_orders = db.query(
+    # Updated Repository Method - Change page_size to limit parameter
+    def get_all_client_order_paginated(self, page: int, db: Session, search_id: int = None, search_name: str = None, search_phone: str = None, search_address: str = None, limit: int = 10):
+        # Calculate offset
+        offset = (page - 1) * limit
+        
+        # Build base query for clients with orders
+        query = db.query(
             Account.cus_id,
-            Account.cus_name, 
+            Account.cus_name,
             Account.address,
             Account.phone_number
         ).join(
-            Order, Account.cus_id == Order.cus_id  # Assuming you have an Order table
+            Order, Account.cus_id == Order.cus_id
         ).filter(
             Account.role == 'user'
-        ).distinct().all()  # Use distinct to avoid duplicates
-
+        ).distinct()
+        
+        # Build search filters
+        search_filters = []
+        active_searches = {}
+        
+        # Add ID filter if provided (now validated in route handler)
+        if search_id is not None:
+            search_filters.append(Account.cus_id == search_id)
+            active_searches['id'] = search_id
+        
+        # Add name filter if provided
+        if search_name and search_name.strip():
+            name_term = f"%{search_name.strip()}%"
+            search_filters.append(Account.cus_name.ilike(name_term))
+            active_searches['name'] = search_name.strip()
+        
+        # Add phone filter if provided
+        if search_phone and search_phone.strip():
+            phone_term = f"%{search_phone.strip()}%"
+            search_filters.append(Account.phone_number.ilike(phone_term))
+            active_searches['phone'] = search_phone.strip()
+        
+        # Add address filter if provided
+        if search_address and search_address.strip():
+            address_term = f"%{search_address.strip()}%"
+            search_filters.append(Account.address.ilike(address_term))
+            active_searches['address'] = search_address.strip()
+        
+        # Apply all search filters with AND logic
+        if search_filters:
+            query = query.filter(and_(*search_filters))
+        
+        # Get total count for pagination info
+        total_clients = query.count()
+        
+        # Get paginated clients with orders - using limit instead of page_size
+        clients_with_orders = query.offset(offset).limit(limit).all()
+        
+        # Build search description for messages
+        search_description = []
+        if active_searches:
+            for field, value in active_searches.items():
+                search_description.append(f"{field}: '{value}'")
+            search_text = ", ".join(search_description)
+        else:
+            search_text = None
+        
+        # Handle empty results
         if not clients_with_orders:
+            message = "No clients with orders found"
+            if search_text:
+                message = f"No clients with orders found matching {search_text}"
+            
             return ResponseModel(
                 code=404,
                 status="Not Found",
-                message="No clients with orders found",
-                result=[]
+                message=message,
+                result=[],
+                pagination={
+                    "current_page": page,
+                    "page_size": limit,  # Changed from page_size to limit
+                    "total_items": 0,
+                    "total_pages": 0,
+                    "has_next": False,
+                    "has_previous": False,
+                    "search_filters": active_searches
+                }
             )
-
+        
         # Convert to list of dictionaries
         clients_data = []
         for client in clients_with_orders:
@@ -347,11 +413,31 @@ class Staff:
                 "address": client.address,
                 "phone_number": client.phone_number
             })
-
+        
+        # Calculate pagination metadata - using limit instead of page_size
+        total_pages = math.ceil(total_clients / limit) if total_clients > 0 else 1
+        has_next = page < total_pages
+        has_previous = page > 1
+        
+        # Build response message
+        message = "Clients with orders retrieved successfully"
+        if search_text:
+            message = f"Search results for clients with orders matching {search_text} retrieved successfully"
+        
         return ResponseModel(
             code=200,
             status="Success",
-            result=clients_data
+            message=message,
+            result=clients_data,
+            pagination={
+                "current_page": page,
+                "page_size": limit,  # Changed from page_size to limit
+                "total_items": total_clients,
+                "total_pages": total_pages,
+                "has_next": has_next,
+                "has_previous": has_previous,
+                "search_filters": active_searches
+            }
         )
     
     def get_client_id(self, cus_id: int, db: Session):  # Changed from str to int

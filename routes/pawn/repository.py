@@ -393,26 +393,84 @@ class Staff:
 
         return list(grouped_pawns.values())
     
-    def get_all_client_pawn(self, db: Session):
-        clients_with_pawns = db.query(
+    def get_all_client_pawn(
+            self, 
+            db: Session, 
+            page: int = 1, 
+            limit: int = 10, 
+            search_name: str = "",
+            search_phone: str = "",
+            search_address: str = ""
+        ):
+        # Build base query
+        query = db.query(
             Account.cus_id,
             Account.cus_name, 
             Account.address,
             Account.phone_number
         ).join(
-            Pawn, Account.cus_id == Pawn.cus_id  # Changed from 'pawn' to 'Pawn'
+            Pawn, Account.cus_id == Pawn.cus_id
         ).filter(
             Account.role == 'user'
-        ).distinct().all()  # Use distinct to avoid duplicates
-
+        )
+        
+        # Add individual search filters
+        if search_name.strip():
+            name_term = f"%{search_name.strip()}%"
+            query = query.filter(Account.cus_name.ilike(name_term))
+        
+        if search_phone.strip():
+            phone_term = f"%{search_phone.strip()}%"
+            query = query.filter(Account.phone_number.ilike(phone_term))
+        
+        if search_address.strip():
+            address_term = f"%{search_address.strip()}%"
+            query = query.filter(Account.address.ilike(address_term))
+        
+        # Use distinct to avoid duplicates
+        query = query.distinct()
+        
+        # Get total count for pagination
+        total_count = query.count()
+        
+        # Calculate pagination info
+        total_pages = (total_count + limit - 1) // limit
+        offset = (page - 1) * limit
+        
+        # Get paginated results
+        clients_with_pawns = query.offset(offset).limit(limit).all()
+        
+        # Build search summary for message
+        search_criteria = []
+        if search_name.strip():
+            search_criteria.append(f"name: '{search_name}'")
+        if search_phone.strip():
+            search_criteria.append(f"phone: '{search_phone}'")
+        if search_address.strip():
+            search_criteria.append(f"address: '{search_address}'")
+        
+        search_summary = " and ".join(search_criteria) if search_criteria else ""
+        
         if not clients_with_pawns:
+            message = "No clients with pawns found"
+            if search_summary:
+                message += f" matching {search_summary}"
+                
             return ResponseModel(
                 code=404,
                 status="Not Found",
-                message="No clients with pawns found",
-                result=[]
+                message=message,
+                result=[],  # Just empty array, no nested structure
+                pagination={
+                    "current_page": page,
+                    "total_pages": 0,
+                    "total_count": 0,
+                    "limit": limit,
+                    "has_next": False,
+                    "has_prev": False
+                }
             )
-
+        
         # Convert to list of dictionaries
         clients_data = []
         for client in clients_with_pawns:
@@ -422,10 +480,79 @@ class Staff:
                 "address": client.address,
                 "phone_number": client.phone_number
             })
-
+        
+        # Build pagination info
+        pagination_info = {
+            "current_page": page,
+            "total_pages": total_pages,
+            "total_count": total_count,
+            "limit": limit,
+            "has_next": page < total_pages,
+            "has_prev": page > 1
+        }
+        
+        message = f"Found {total_count} clients"
+        if search_summary:
+            message += f" matching {search_summary}"
+        
         return ResponseModel(
             code=200,
             status="Success",
+            message=message,
+            result=clients_data,  # Just the clients array, no nested structure
+            pagination=pagination_info  # Use root-level pagination
+        )
+
+    # Alternative: Simple search without pagination (if you prefer)
+    def get_all_client_pawn_simple(self, db: Session, search: str = ""):
+        # Build base query
+        query = db.query(
+            Account.cus_id,
+            Account.cus_name, 
+            Account.address,
+            Account.phone_number
+        ).join(
+            Pawn, Account.cus_id == Pawn.cus_id
+        ).filter(
+            Account.role == 'user'
+        )
+        
+        # Add search filters if search term provided
+        if search.strip():
+            search_term = f"%{search.strip()}%"
+            query = query.filter(
+                or_(
+                    Account.cus_name.ilike(search_term),
+                    Account.phone_number.ilike(search_term),
+                    Account.address.ilike(search_term)
+                )
+            )
+        
+        # Get all results with distinct
+        clients_with_pawns = query.distinct().all()
+        
+        if not clients_with_pawns:
+            return ResponseModel(
+                code=404,
+                status="Not Found",
+                message="No clients with pawns found" if not search else f"No clients found matching '{search}'",
+                result=[]
+            )
+        
+        # Convert to list of dictionaries
+        clients_data = []
+        for client in clients_with_pawns:
+            clients_data.append({
+                "cus_id": client.cus_id,
+                "cus_name": client.cus_name,
+                "address": client.address,
+                "phone_number": client.phone_number
+            })
+        
+        return ResponseModel(
+            code=200,
+            status="Success",
+            message=f"Found {len(clients_data)} clients" + (f" matching '{search}'" if search else ""),
             result=clients_data
         )
         

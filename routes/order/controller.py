@@ -31,11 +31,29 @@ def get_client_order(
 
 @router.get("/order/all_client", response_model=ResponseModel)
 def get_all_client_order(
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    limit: int = Query(10, ge=1, le=100, description="Number of items per page (1-100)"),
+    search_id: int = Query(None, description="Search by customer ID"),
+    search_name: str = Query(None, description="Search by customer name"),
+    search_phone: str = Query(None, description="Search by phone number"),
+    search_address: str = Query(None, description="Search by address"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
     staff.is_staff(current_user)
-    return staff.get_all_client_order(db)
+    
+    # Additional validation to prevent the error
+    if search_id is not None:
+        try:
+            # Ensure it's a valid integer
+            search_id = int(search_id)
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid ID format. ID must be a valid integer, received: {search_id}"
+            )
+    
+    return staff.get_all_client_order_paginated(page, db, search_id, search_name, search_phone, search_address, limit)
 
 @router.get("/order/client/{cus_id}", response_model=ResponseModel)
 def get_client_id(

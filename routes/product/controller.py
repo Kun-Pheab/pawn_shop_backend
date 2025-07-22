@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 # from models import Account
@@ -24,9 +24,29 @@ def create_product(product_info: CreateProduct, db: Session = Depends(get_db), c
     return staff.create_product(product_info, db, current_user)
 
 @router.get("/product", response_model=ResponseModel)
-def get_all_product(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def get_all_product(
+    db: Session = Depends(get_db), 
+    current_user: dict = Depends(get_current_user),
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    limit: int = Query(10, ge=1, le=100, description="Number of items per page (max 100)"),
+    search: Optional[str] = Query(None, description="Search products by name")
+):
     staff.is_staff(current_user)
-    return staff.get_product(db=db)
+    return staff.get_product(db=db, page=page, limit=limit, search=search)
+
+@router.get("/product/search", response_model=ResponseModel)
+def search_products(
+    search_term: str = Query(..., min_length=1, description="Search term for product name"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    limit: int = Query(10, ge=1, le=100, description="Number of items per page (max 100)")
+):
+    """
+    Search products by name with pagination
+    """
+    staff.is_staff(current_user)
+    return staff.search_products(db=db, search_term=search_term, page=page, limit=limit)
 
 @router.put("/product", response_model=ResponseModel)
 def update_product(

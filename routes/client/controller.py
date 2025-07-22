@@ -24,9 +24,14 @@ def create_client(client_info: CreateClient, db: Session = Depends(get_db), curr
     return staff.create_client(client_info, db)
 
 @router.get("/client", response_model=ResponseModel[List[GetClient]])
-def get_all_client(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def get_clients_paginated(
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    search: str = Query(None, description="Search by name, phone number, or address"),
+    db: Session = Depends(get_db), 
+    current_user: dict = Depends(get_current_user)
+):
     staff.is_staff(current_user)
-    return staff.get_client(db)
+    return staff.get_clients_paginated(page, db, search)
 
 @router.get("/client/{phone_number}", response_model=ResponseModel[List[GetClient]])
 def get_client_phone(
