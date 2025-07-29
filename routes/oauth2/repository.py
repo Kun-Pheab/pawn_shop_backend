@@ -17,19 +17,19 @@ ALGORITHM = os.getenv("ALGORITHM")
 http_bearer = HTTPBearer()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# def create_user(db: Session, cus_name: str, phone_number: str, password: Optional[str] = None):
-#     user = Account(
-#         cus_name=cus_name, 
-#         phone_number=phone_number,)
+def create_user(db: Session, cus_name: str, phone_number: str, password: Optional[str] = None):
+    user = Account(
+        cus_name=cus_name, 
+        phone_number=phone_number,)
     
-#     if password:
-#         user.password = pwd_context.hash(password)
-#         user.role = "admin"
+    if password:
+        user.password = pwd_context.hash(password)
+        user.role = "admin"
     
-#     db.add(user)
-#     db.commit()
-#     db.refresh(user)
-#     return user
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
 
 def create_token(data: dict, expires_delta: timedelta):
     to_encode = data.copy()

@@ -30,6 +30,10 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 def create_default_admin():
     """Create a default admin user if none exists."""
+    if SessionLocal is None:
+        logger.warning("Database session not available. Skipping admin user creation.")
+        return
+        
     try:
         with SessionLocal() as db:
             from entities import Account
@@ -50,19 +54,24 @@ def create_default_admin():
             logger.info("Default admin user created successfully.")
     except Exception as e:
         logger.error(f"Failed to create admin user: {str(e)}")
-        raise
+        # Don't raise the exception to allow the app to continue
+        logger.warning("Admin user creation failed, but application will continue")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application startup and shutdown."""
     logger.info("Starting Pawn Shop API...")
     try:
-        entities.Base.metadata.create_all(engine)
-        logger.info("Database tables initialized.")
-        create_default_admin()
+        if engine is not None:
+            entities.Base.metadata.create_all(engine)
+            logger.info("Database tables initialized.")
+            create_default_admin()
+        else:
+            logger.warning("Database engine is not available. Skipping database initialization.")
     except Exception as e:
         logger.error(f"Startup failed: {str(e)}")
-        raise
+        # Don't raise the exception to allow the app to start even if DB is not available
+        logger.warning("Application will start without database functionality")
     yield
     logger.info("Shutting down Pawn Shop API...")
 
@@ -89,7 +98,24 @@ app.add_middleware(
 async def health_check():
     """Return API health status."""
     try:
-        return {"status": "healthy", "version": "1.0.0"}
+        health_status = {
+            "status": "healthy", 
+            "version": "1.0.0",
+            "database": "connected" if engine is not None else "disconnected"
+        }
+        
+        # Test database connection if available
+        if engine is not None:
+            try:
+                from sqlalchemy import text
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                health_status["database"] = "connected"
+            except Exception as e:
+                health_status["database"] = "error"
+                health_status["database_error"] = str(e)
+        
+        return health_status
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         raise HTTPException(status_code=503, detail="Service unavailable")
@@ -100,11 +126,11 @@ async def root():
     return {"message": "Pawn Shop API", "version": "1.0.0"}
 
 # Include API routers
-# app.include_router(auth_controller.router, prefix="/api/v1/auth", tags=["Authentication"])
-# app.include_router(product_controller.router, prefix="/api/v1/products", tags=["Products"])
-# app.include_router(client_controller.router, prefix="/api/v1/clients", tags=["Clients"])
-# app.include_router(order_controller.router, prefix="/api/v1/orders", tags=["Orders"])
-# app.include_router(pawn_controller.router, prefix="/api/v1/pawn", tags=["Pawn"])
+app.include_router(auth_controller.router, prefix="/api/v1/auth", tags=["Authentication"])
+app.include_router(product_controller.router, prefix="/api/v1/products", tags=["Products"])
+app.include_router(client_controller.router, prefix="/api/v1/clients", tags=["Clients"])
+app.include_router(order_controller.router, prefix="/api/v1/orders", tags=["Orders"])
+app.include_router(pawn_controller.router, prefix="/api/v1/pawns", tags=["Pawns"])
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):

@@ -15,28 +15,28 @@ router = APIRouter(
     tags=["Authentication"],
 )
 
-# @router.post("/create_user")
-# def create_new_user(
-#     cus_name: str,
-#     phone_number: str,
-#     password: Optional[str] = None,
-#     db: Session = Depends(get_db)):
+@router.post("/create_user")
+def create_new_user(
+    cus_name: str,
+    phone_number: str,
+    password: Optional[str] = None,
+    db: Session = Depends(get_db)):
     
-#     existing_user = db.query(Account).filter(Account.phone_number == phone_number).first()
-#     if existing_user:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="Phone Number already registered",
-#         )
+    existing_user = db.query(Account).filter(Account.phone_number == phone_number).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phone Number already registered",
+        )
     
-#     create_user(db=db, cus_name=cus_name, phone_number=phone_number, password=password)
-#     db.commit()
+    create_user(db=db, cus_name=cus_name, phone_number=phone_number, password=password)
+    db.commit()
     
-#     return {
-#                 'code' : status.HTTP_200_OK,
-#                 'status' : "Success",
-#                 'message' : "User created successfully"
-#     }
+    return {
+                'code' : status.HTTP_200_OK,
+                'status' : "Success",
+                'message' : "User created successfully"
+    }
 
 @router.get("/sign_in")
 def sign_in_get(

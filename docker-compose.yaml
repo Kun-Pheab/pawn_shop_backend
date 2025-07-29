@@ -1,4 +1,17 @@
 services:
+  db:
+    image: postgres:15
+    container_name: pawnshop_db
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-pawnshop}
+      - POSTGRES_USER=${POSTGRES_USER:-pawnshop}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-pawnshop123}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   web: 
     build: .
     container_name: pawnshop_web
@@ -7,7 +20,7 @@ services:
       - "8000:8000"
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://pawnshop:pawnshop123@db:5432/pawnshop}
       - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-here-change-this-in-production}
       - ALGORITHM=${ALGORITHM:-HS256}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
@@ -17,4 +30,9 @@ services:
       - DEFAULT_ADMIN_NAME=${DEFAULT_ADMIN_NAME:-Admin}
       - DEFAULT_ADMIN_PHONE=${DEFAULT_ADMIN_PHONE:-069260405}
       - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-M^bd4LC3^f~Z|iE?}
+    depends_on:
+      - db
     restart: unless-stopped
+
+volumes:
+  postgres_data:

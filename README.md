@@ -66,6 +66,29 @@ This is a robust backend API for a pawn shop management system built with FastAP
 - Docker (recommended)
 - pip (Python package manager)
 
+### Docker Deployment (Recommended)
+
+The easiest way to run the application is using Docker Compose, which includes a PostgreSQL database:
+
+```bash
+# 1. Clone the repository
+git clone <repository-url>
+cd pawn_shop_backend
+
+# 2. Build and start containers
+docker compose up --build
+```
+
+This will:
+- Start a PostgreSQL database container
+- Build and start the FastAPI application
+- Set up all necessary environment variables automatically
+
+The application will be available at:
+- API: http://localhost:8000
+- Documentation: http://localhost:8000/docs
+- Health Check: http://localhost:8000/health
+
 ### Local Development
 
 1. Create Virtual Environment
@@ -91,41 +114,40 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-3. Set up environment variables (create `.env` file):
-```env
-DATABASE_URL=postgresql://username:password@localhost:5432/pawnshop
-SECRET_KEY=your-super-secret-key-here
-ENVIRONMENT=development
-ALLOWED_ORIGINS=http://localhost:3000
-ALLOWED_HOSTS=localhost,127.0.0.1
+3. Set up PostgreSQL database:
+```bash
+# Install PostgreSQL (Ubuntu/Debian)
+sudo apt-get install postgresql postgresql-contrib
+
+# Create database and user
+sudo -u postgres psql
+CREATE DATABASE pawnshop;
+CREATE USER pawnshop WITH PASSWORD 'pawnshop123';
+GRANT ALL PRIVILEGES ON DATABASE pawnshop TO pawnshop;
+\q
 ```
 
-4. Run the application:
+4. Set up environment variables (copy from env.example):
+```bash
+cp env.example .env
+# Edit .env file with your configuration
+```
+
+5. Test database connection:
+```bash
+python test_db.py
+```
+
+6. Run the application:
 ```bash
 uvicorn main:app --reload
 ```
 
-### Docker Deployment (Recommended)
-
-#### Development
-```bash
-# 1. Create .env file with your configuration
-# 2. Build and start containers
-docker compose up --build
-```
-
-#### Production
-```bash
-# 1. Set environment variables
-export SECRET_KEY="your-super-secret-production-key"
-export POSTGRES_PASSWORD="strong-production-password"
-export ALLOWED_ORIGINS="https://yourdomain.com"
-
-# 2. Build and start in production mode
-docker compose up --build -d
-```
-
 ## 🔐 Environment Variables
+
+The application uses environment variables for configuration. These can be set in a `.env` file in the project root.
+
+### Required Environment Variables
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
@@ -134,9 +156,62 @@ docker compose up --build -d
 | `ENVIRONMENT` | Environment (development/production) | No | development |
 | `ALLOWED_ORIGINS` | CORS allowed origins (comma-separated) | No | http://localhost:3000 |
 | `ALLOWED_HOSTS` | Trusted hosts (comma-separated) | No | localhost,127.0.0.1 |
+
+### Database Configuration Variables
+
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `POSTGRES_DB` | PostgreSQL database name | No | pawnshop |
 | `POSTGRES_USER` | PostgreSQL username | No | pawnshop |
 | `POSTGRES_PASSWORD` | PostgreSQL password | No | pawnshop123 |
-| `POSTGRES_DB` | PostgreSQL database name | No | pawnshop |
+
+### Docker Compose Environment Variables
+
+When using Docker Compose, the application automatically reads environment variables from the `.env` file. The docker-compose.yaml file uses the `${VARIABLE_NAME:-default_value}` syntax to set environment variables with fallback defaults.
+
+**Example .env file:**
+```env
+# Database Configuration
+POSTGRES_DB=pawnshop
+POSTGRES_USER=pawnshop
+POSTGRES_PASSWORD=pawnshop123
+DATABASE_URL=postgresql://pawnshop:pawnshop123@db:5432/pawnshop
+
+# Security
+SECRET_KEY=your-super-secret-key-here-change-this-in-production
+ALGORITHM=HS256
+
+# Token Configuration
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=7
+
+# Environment
+ENVIRONMENT=development
+
+# CORS and Hosts
+ALLOWED_ORIGINS=http://localhost:3000
+ALLOWED_HOSTS=localhost,127.0.0.1
+
+# Default Admin User
+DEFAULT_ADMIN_NAME=Admin
+DEFAULT_ADMIN_PHONE=069260405
+DEFAULT_ADMIN_PASSWORD=M^bd4LC3^f~Z|iE?}
+```
+
+### Testing Environment Variables
+
+You can test if your environment variables are loaded correctly:
+
+```bash
+# Test environment variable loading
+python3 test_env.py
+
+# Test database connection
+python3 test_db.py
+
+# Validate Docker Compose configuration
+docker compose config
+```
 
 ## 📚 API Documentation
 
@@ -145,6 +220,47 @@ Once the application is running, you can access:
 - Swagger UI documentation: `http://localhost:8000/docs`
 - ReDoc documentation: `http://localhost:8000/redoc`
 - Health check: `http://localhost:8000/health`
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+1. **Database Connection Error**: 
+   - Ensure PostgreSQL is running
+   - Check `DATABASE_URL` is correct
+   - For Docker: Ensure the database container is running
+   - Run `python test_db.py` to test connection
+
+2. **CORS Errors**: 
+   - Check `ALLOWED_ORIGINS` configuration
+   - Ensure frontend URL is included in allowed origins
+
+3. **Authentication Issues**: 
+   - Verify `SECRET_KEY` is set correctly
+   - Check token expiration settings
+
+4. **Docker Issues**:
+   - Ensure Docker and Docker Compose are installed
+   - Check if ports 8000 and 5432 are available
+   - Run `docker compose logs` to see detailed error messages
+
+### Health Check
+
+The application includes a health check endpoint at `/health` that returns:
+```json
+{
+  "status": "healthy",
+  "version": "1.0.0",
+  "database": "connected"
+}
+```
+
+### Database Connection Testing
+
+Use the included test script to verify database connectivity:
+```bash
+python test_db.py
+```
 
 ## 🚀 Production Deployment Checklist
 
@@ -158,22 +274,3 @@ Once the application is running, you can access:
 - [ ] Configure monitoring and logging
 - [ ] Set up proper firewall rules
 - [ ] Consider using a reverse proxy (nginx)
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-1. **Database Connection Error**: Ensure PostgreSQL is running and `DATABASE_URL` is correct
-2. **CORS Errors**: Check `ALLOWED_ORIGINS` configuration
-3. **Authentication Issues**: Verify `SECRET_KEY` is set correctly
-
-### Health Check
-
-The application includes a health check endpoint at `/health` that returns:
-```json
-{
-  "status": "healthy",
-  "environment": "production",
-  "version": "1.0.0"
-}
-```

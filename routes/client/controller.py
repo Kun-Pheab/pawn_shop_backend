@@ -10,8 +10,8 @@ from routes.client.model import *
 # from routes.user.model import CreatePawn 
 
 router = APIRouter(
-    tags=["Client"],
-    prefix="/api"
+    tags=["Clients"],
+    # prefix="/api"
 )
 
 staff = Staff()

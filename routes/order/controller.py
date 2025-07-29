@@ -8,8 +8,8 @@ from routes.order.repository import Staff
 from routes.order.model import *
 
 router = APIRouter(
-    tags=["Order"],
-    prefix="/api"
+    tags=["Orders"],
+    # prefix="/api"
 )
 
 staff = Staff()
