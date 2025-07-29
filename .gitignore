@@ -1,6 +1,11 @@
 .env
+.env.production
 __pycache__
 fastapi-env
 .idea
-
 api.zip
+
+# Production files
+nginx/ssl/
+backups/
+*.log

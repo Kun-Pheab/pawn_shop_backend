@@ -1,5 +1,6 @@
-from typing import Optional, TypeVar, Generic, Dict, Any
+from typing import Optional, TypeVar, Generic
 from pydantic import BaseModel
+
 T = TypeVar("T")
 
 class ResponseModel(BaseModel, Generic[T]):
@@ -7,4 +8,3 @@ class ResponseModel(BaseModel, Generic[T]):
     status: str
     message: Optional[str] = None
     result: Optional[T] = None
-    pagination: Optional[Dict[str, Any]] = None
