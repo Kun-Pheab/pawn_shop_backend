@@ -100,11 +100,11 @@ async def root():
     return {"message": "Pawn Shop API", "version": "1.0.0"}
 
 # Include API routers
-app.include_router(auth_controller.router, prefix="/api/v1/auth", tags=["Authentication"])
-app.include_router(product_controller.router, prefix="/api/v1/products", tags=["Products"])
-app.include_router(client_controller.router, prefix="/api/v1/clients", tags=["Clients"])
-app.include_router(order_controller.router, prefix="/api/v1/orders", tags=["Orders"])
-app.include_router(pawn_controller.router, prefix="/api/v1/pawn", tags=["Pawn"])
+# app.include_router(auth_controller.router, prefix="/api/v1/auth", tags=["Authentication"])
+# app.include_router(product_controller.router, prefix="/api/v1/products", tags=["Products"])
+# app.include_router(client_controller.router, prefix="/api/v1/clients", tags=["Clients"])
+# app.include_router(order_controller.router, prefix="/api/v1/orders", tags=["Orders"])
+# app.include_router(pawn_controller.router, prefix="/api/v1/pawn", tags=["Pawn"])
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
