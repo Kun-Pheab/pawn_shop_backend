@@ -41,3 +41,41 @@ def get_client_phone(
 ):
     staff.is_staff(current_user)
     return staff.get_client_phone(phone_number, db)
+
+@router.delete("/client/{cus_id}", response_model=ResponseModel)
+def delete_client(
+    cus_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    staff.is_staff(current_user)
+    return staff.delete_client(cus_id, db)
+
+@router.delete("/client/phone/{phone_number}", response_model=ResponseModel)
+def delete_client_by_phone(
+    phone_number: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    staff.is_staff(current_user)
+    return staff.delete_client_by_phone(phone_number, db)
+
+@router.patch("/client/{cus_id}", response_model=ResponseModel)
+def update_client(
+    cus_id: int,
+    client_update: CreateClient,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    staff.is_staff(current_user)
+    return staff.update_client(cus_id, client_update, db)
+
+@router.patch("/client/phone/{phone_number}", response_model=ResponseModel)
+def update_client_by_phone(
+    phone_number: str,
+    client_update: CreateClient,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    staff.is_staff(current_user)
+    return staff.update_client_by_phone(phone_number, client_update, db)

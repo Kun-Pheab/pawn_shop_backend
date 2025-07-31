@@ -1,4 +1,5 @@
 fastapi-env/
 __pycache__/
 docker-compose.yaml
-.env
+
+env

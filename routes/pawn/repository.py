@@ -897,3 +897,112 @@ class Staff:
                 message=f"Retrieved {len(result)} customers with pawn records.",
                 result=result
             )
+
+    def delete_pawn(self, pawn_id: int, db: Session):
+        """Delete a pawn and all its details"""
+        try:
+            # Check if pawn exists
+            pawn = db.query(Pawn).filter(Pawn.pawn_id == pawn_id).first()
+            if not pawn:
+                return ResponseModel(
+                    code=404,
+                    status="Error",
+                    message=f"Pawn {pawn_id} not found"
+                )
+            
+            # Delete pawn details first (foreign key constraint)
+            db.query(PawnDetail).filter(PawnDetail.pawn_id == pawn_id).delete()
+            
+            # Delete the pawn
+            db.delete(pawn)
+            db.commit()
+            
+            return ResponseModel(
+                code=200,
+                status="Success",
+                message=f"Pawn {pawn_id} deleted successfully"
+            )
+            
+        except Exception as e:
+            db.rollback()
+            return ResponseModel(
+                code=500,
+                status="Error",
+                message=f"Failed to delete pawn: {str(e)}"
+            )
+
+    def update_pawn(self, pawn_id: int, pawn_update: CreatePawn, db: Session, current_user: dict):
+        """Update an existing pawn"""
+        try:
+            # Check if pawn exists
+            pawn = db.query(Pawn).filter(Pawn.pawn_id == pawn_id).first()
+            if not pawn:
+                return ResponseModel(
+                    code=404,
+                    status="Error",
+                    message=f"Pawn {pawn_id} not found"
+                )
+            
+            # Update customer information if provided
+            if pawn_update.cus_name or pawn_update.address or pawn_update.phone_number:
+                customer = db.query(Account).filter(Account.cus_id == pawn.cus_id).first()
+                if customer:
+                    if pawn_update.cus_name:
+                        customer.cus_name = pawn_update.cus_name
+                    if pawn_update.address:
+                        customer.address = pawn_update.address
+                    if pawn_update.phone_number:
+                        customer.phone_number = pawn_update.phone_number
+                    db.commit()
+            
+            # Update pawn information
+            if pawn_update.pawn_deposit is not None:
+                pawn.pawn_deposit = pawn_update.pawn_deposit
+            if pawn_update.pawn_date is not None:
+                pawn.pawn_date = pawn_update.pawn_date
+            if pawn_update.pawn_expire_date is not None:
+                pawn.pawn_expire_date = pawn_update.pawn_expire_date
+            
+            db.commit()
+            
+            # Update pawn details if provided
+            if pawn_update.pawn_product_detail:
+                # Delete existing pawn details
+                db.query(PawnDetail).filter(PawnDetail.pawn_id == pawn_id).delete()
+                
+                # Add new pawn details
+                for product in pawn_update.pawn_product_detail:
+                    existing_product = db.query(Product).filter(
+                        Product.prod_name.ilike(product.prod_name)
+                    ).first()
+
+                    if not existing_product:
+                        prod = self.create_product(CreateProduct(prod_name=product.prod_name), db, current_user)
+                        prod_id = prod.prod_id
+                    else:
+                        prod_id = existing_product.prod_id
+
+                    pawn_detail = PawnDetail(
+                        pawn_id=pawn_id,
+                        prod_id=prod_id,
+                        pawn_weight=product.pawn_weight,
+                        pawn_amount=product.pawn_amount,
+                        pawn_unit_price=product.pawn_unit_price
+                    )
+                    db.add(pawn_detail)
+                
+                db.commit()
+            
+            return ResponseModel(
+                code=200,
+                status="Success",
+                message=f"Pawn {pawn_id} updated successfully"
+            )
+            
+        except Exception as e:
+            db.rollback()
+            return ResponseModel(
+                code=500,
+                status="Error",
+                message=f"Failed to update pawn: {str(e)}"
+            )

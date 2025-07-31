@@ -9,3 +9,12 @@ api.zip
 nginx/ssl/
 backups/
 *.log
+
+# Environment
+env
+
+
+API_ENDPOINTS.md
+FRONTEND_ROUTES.md
+sample_data.sql
+test_sample_data.py

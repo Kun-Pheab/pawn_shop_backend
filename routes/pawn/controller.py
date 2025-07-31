@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 # from models import Account
@@ -107,3 +107,22 @@ def get_pawn_by_id(
 ):
     staff.is_staff(current_user)
     return staff.get_pawn_print(db, pawn_id)
+
+@router.delete("/pawn/{pawn_id}", response_model=ResponseModel)
+def delete_pawn(
+    pawn_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    staff.is_staff(current_user)
+    return staff.delete_pawn(pawn_id, db)
+
+@router.patch("/pawn/{pawn_id}", response_model=ResponseModel)
+def update_pawn(
+    pawn_id: int,
+    pawn_update: CreatePawn,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    staff.is_staff(current_user)
+    return staff.update_pawn(pawn_id, pawn_update, db, current_user)

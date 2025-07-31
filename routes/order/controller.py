@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_db
@@ -111,3 +111,22 @@ def get_order_print(
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/order/{order_id}", response_model=ResponseModel)
+def delete_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    staff.is_staff(current_user)
+    return staff.delete_order(order_id, db)
+
+@router.patch("/order/{order_id}", response_model=ResponseModel)
+def update_order(
+    order_id: int,
+    order_update: CreateOrder,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    staff.is_staff(current_user)
+    return staff.update_order(order_id, order_update, db, current_user)

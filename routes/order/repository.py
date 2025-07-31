@@ -771,3 +771,110 @@ class Staff:
                 message=f"Retrieved {len(result)} customers with orders.",
                 result=result
             )
+
+    def delete_order(self, order_id: int, db: Session):
+        """Delete an order and all its details"""
+        try:
+            # Check if order exists
+            order = db.query(Order).filter(Order.order_id == order_id).first()
+            if not order:
+                return ResponseModel(
+                    code=404,
+                    status="Error",
+                    message=f"Order {order_id} not found"
+                )
+            
+            # Delete order details first (foreign key constraint)
+            db.query(OrderDetail).filter(OrderDetail.order_id == order_id).delete()
+            
+            # Delete the order
+            db.delete(order)
+            db.commit()
+            
+            return ResponseModel(
+                code=200,
+                status="Success",
+                message=f"Order {order_id} deleted successfully"
+            )
+            
+        except Exception as e:
+            db.rollback()
+            return ResponseModel(
+                code=500,
+                status="Error",
+                message=f"Failed to delete order: {str(e)}"
+            )
+
+    def update_order(self, order_id: int, order_update: CreateOrder, db: Session, current_user: dict):
+        """Update an existing order"""
+        try:
+            # Check if order exists
+            order = db.query(Order).filter(Order.order_id == order_id).first()
+            if not order:
+                return ResponseModel(
+                    code=404,
+                    status="Error",
+                    message=f"Order {order_id} not found"
+                )
+            
+            # Update customer information if provided
+            if order_update.cus_name or order_update.address or order_update.phone_number:
+                customer = db.query(Account).filter(Account.cus_id == order.cus_id).first()
+                if customer:
+                    if order_update.cus_name:
+                        customer.cus_name = order_update.cus_name
+                    if order_update.address:
+                        customer.address = order_update.address
+                    if order_update.phone_number:
+                        customer.phone_number = order_update.phone_number
+                    db.commit()
+            
+            # Update order information
+            if order_update.order_deposit is not None:
+                order.order_deposit = order_update.order_deposit
+            
+            db.commit()
+            
+            # Update order details if provided
+            if order_update.order_product_detail:
+                # Delete existing order details
+                db.query(OrderDetail).filter(OrderDetail.order_id == order_id).delete()
+                
+                # Add new order details
+                for product in order_update.order_product_detail:
+                    existing_product = db.query(Product).filter(
+                        Product.prod_name == func.lower(product.prod_name)
+                    ).first()
+
+                    if not existing_product:
+                        prod = self.create_product(CreateProduct(prod_name=product.prod_name), db, current_user)
+                        prod_id = prod.prod_id
+                    else:
+                        prod_id = existing_product.prod_id
+
+                    order_detail = OrderDetail(
+                        order_id=order_id,
+                        prod_id=prod_id,
+                        order_weight=product.order_weight,
+                        order_amount=product.order_amount,
+                        product_sell_price=product.product_sell_price,
+                        product_labor_cost=product.product_labor_cost,
+                        product_buy_price=product.product_buy_price,
+                    )
+                    db.add(order_detail)
+                
+                db.commit()
+            
+            return ResponseModel(
+                code=200,
+                status="Success",
+                message=f"Order {order_id} updated successfully"
+            )
+            
+        except Exception as e:
+            db.rollback()
+            return ResponseModel(
+                code=500,
+                status="Error",
+                message=f"Failed to update order: {str(e)}"
+            )

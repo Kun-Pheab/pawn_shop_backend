@@ -127,3 +127,245 @@ class Staff:
             status="Success",
             result=client
         )
+
+    def delete_client(self, cus_id: int, db: Session):
+        """Delete a client and all their associated data (orders, pawns, etc.)"""
+        try:
+            # Check if client exists
+            client = db.query(Account).filter(
+                and_(
+                    Account.cus_id == cus_id,
+                    Account.role == 'user'  # Only allow deleting customers, not admins
+                )
+            ).first()
+            
+            if not client:
+                return ResponseModel(
+                    code=404,
+                    status="Error",
+                    message=f"Client with ID {cus_id} not found"
+                )
+            
+            # Get client's orders and pawns for summary
+            client_orders = db.query(Order).filter(Order.cus_id == cus_id).all()
+            client_pawns = db.query(Pawn).filter(Pawn.cus_id == cus_id).all()
+            
+            # Delete in reverse order to respect foreign key constraints
+            # 1. Delete pawn details
+            db.query(PawnDetail).join(Pawn).filter(Pawn.cus_id == cus_id).delete(synchronize_session=False)
+            
+            # 2. Delete order details
+            db.query(OrderDetail).join(Order).filter(Order.cus_id == cus_id).delete(synchronize_session=False)
+            
+            # 3. Delete pawns
+            db.query(Pawn).filter(Pawn.cus_id == cus_id).delete()
+            
+            # 4. Delete orders
+            db.query(Order).filter(Order.cus_id == cus_id).delete()
+            
+            # 5. Delete the client account
+            db.delete(client)
+            db.commit()
+            
+            # Prepare summary message
+            summary = []
+            if client_orders:
+                summary.append(f"{len(client_orders)} order(s)")
+            if client_pawns:
+                summary.append(f"{len(client_pawns)} pawn(s)")
+            
+            summary_text = f" and {', '.join(summary)}" if summary else ""
+            
+            return ResponseModel(
+                code=200,
+                status="Success",
+                message=f"Client {client.cus_name} (ID: {cus_id}) deleted successfully{summary_text}"
+            )
+            
+        except Exception as e:
+            db.rollback()
+            return ResponseModel(
+                code=500,
+                status="Error",
+                message=f"Failed to delete client: {str(e)}"
+            )
+
+    def delete_client_by_phone(self, phone_number: str, db: Session):
+        """Delete a client by phone number and all their associated data"""
+        try:
+            # Check if client exists
+            client = db.query(Account).filter(
+                and_(
+                    Account.phone_number == phone_number,
+                    Account.role == 'user'  # Only allow deleting customers, not admins
+                )
+            ).first()
+            
+            if not client:
+                return ResponseModel(
+                    code=404,
+                    status="Error",
+                    message=f"Client with phone number {phone_number} not found"
+                )
+            
+            # Get client's orders and pawns for summary
+            client_orders = db.query(Order).filter(Order.cus_id == client.cus_id).all()
+            client_pawns = db.query(Pawn).filter(Pawn.cus_id == client.cus_id).all()
+            
+            # Delete in reverse order to respect foreign key constraints
+            # 1. Delete pawn details
+            db.query(PawnDetail).join(Pawn).filter(Pawn.cus_id == client.cus_id).delete(synchronize_session=False)
+            
+            # 2. Delete order details
+            db.query(OrderDetail).join(Order).filter(Order.cus_id == client.cus_id).delete(synchronize_session=False)
+            
+            # 3. Delete pawns
+            db.query(Pawn).filter(Pawn.cus_id == client.cus_id).delete()
+            
+            # 4. Delete orders
+            db.query(Order).filter(Order.cus_id == client.cus_id).delete()
+            
+            # 5. Delete the client account
+            db.delete(client)
+            db.commit()
+            
+            # Prepare summary message
+            summary = []
+            if client_orders:
+                summary.append(f"{len(client_orders)} order(s)")
+            if client_pawns:
+                summary.append(f"{len(client_pawns)} pawn(s)")
+            
+            summary_text = f" and {', '.join(summary)}" if summary else ""
+            
+            return ResponseModel(
+                code=200,
+                status="Success",
+                message=f"Client {client.cus_name} (Phone: {phone_number}) deleted successfully{summary_text}"
+            )
+            
+        except Exception as e:
+            db.rollback()
+            return ResponseModel(
+                code=500,
+                status="Error",
+                message=f"Failed to delete client: {str(e)}"
+            )
+
+    def update_client(self, cus_id: int, client_update: CreateClient, db: Session):
+        """Update an existing client's information"""
+        try:
+            # Check if client exists
+            client = db.query(Account).filter(
+                and_(
+                    Account.cus_id == cus_id,
+                    Account.role == 'user'  # Only allow updating customers, not admins
+                )
+            ).first()
+            
+            if not client:
+                return ResponseModel(
+                    code=404,
+                    status="Error",
+                    message=f"Client with ID {cus_id} not found"
+                )
+            
+            # Check if new phone number conflicts with another client (if phone number is being updated)
+            if client_update.phone_number and client_update.phone_number != client.phone_number:
+                existing_phone = db.query(Account).filter(
+                    and_(
+                        Account.phone_number == client_update.phone_number,
+                        Account.cus_id != cus_id,
+                        Account.role == 'user'
+                    )
+                ).first()
+                
+                if existing_phone:
+                    return ResponseModel(
+                        code=400,
+                        status="Error",
+                        message=f"Phone number {client_update.phone_number} is already registered to another client"
+                    )
+            
+            # Update client information
+            if client_update.cus_name:
+                client.cus_name = client_update.cus_name
+            if client_update.address:
+                client.address = client_update.address
+            if client_update.phone_number:
+                client.phone_number = client_update.phone_number
+            
+            db.commit()
+            
+            return ResponseModel(
+                code=200,
+                status="Success",
+                message=f"Client {client.cus_name} (ID: {cus_id}) updated successfully"
+            )
+            
+        except Exception as e:
+            db.rollback()
+            return ResponseModel(
+                code=500,
+                status="Error",
+                message=f"Failed to update client: {str(e)}"
+            )
+
+    def update_client_by_phone(self, phone_number: str, client_update: CreateClient, db: Session):
+        """Update an existing client's information by phone number"""
+        try:
+            # Check if client exists
+            client = db.query(Account).filter(
+                and_(
+                    Account.phone_number == phone_number,
+                    Account.role == 'user'  # Only allow updating customers, not admins
+                )
+            ).first()
+            
+            if not client:
+                return ResponseModel(
+                    code=404,
+                    status="Error",
+                    message=f"Client with phone number {phone_number} not found"
+                )
+            
+            # Check if new phone number conflicts with another client (if phone number is being updated)
+            if client_update.phone_number and client_update.phone_number != phone_number:
+                existing_phone = db.query(Account).filter(
+                    and_(
+                        Account.phone_number == client_update.phone_number,
+                        Account.cus_id != client.cus_id,
+                        Account.role == 'user'
+                    )
+                ).first()
+                
+                if existing_phone:
+                    return ResponseModel(
+                        code=400,
+                        status="Error",
+                        message=f"Phone number {client_update.phone_number} is already registered to another client"
+                    )
+            
+            # Update client information
+            if client_update.cus_name:
+                client.cus_name = client_update.cus_name
+            if client_update.address:
+                client.address = client_update.address
+            if client_update.phone_number:
+                client.phone_number = client_update.phone_number
+            
+            db.commit()
+            
+            return ResponseModel(
+                code=200,
+                status="Success",
+                message=f"Client {client.cus_name} (Phone: {phone_number}) updated successfully"
+            )
+            
+        except Exception as e:
+            db.rollback()
+            return ResponseModel(
+                code=500,
+                status="Error",
+                message=f"Failed to update client: {str(e)}"
+            )
