@@ -13,7 +13,6 @@ backups/
 # Environment
 env
 
-
 API_ENDPOINTS.md
 FRONTEND_ROUTES.md
 sample_data.sql

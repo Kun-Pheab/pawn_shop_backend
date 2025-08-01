@@ -124,7 +124,7 @@ def delete_order(
 @router.patch("/order/{order_id}", response_model=ResponseModel)
 def update_order(
     order_id: int,
-    order_update: CreateOrder,
+    order_update: PatchOrder,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):

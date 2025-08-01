@@ -1,6 +1,7 @@
 import math
 from fastapi import HTTPException
 from routes.user.model import *
+from routes.order.model import PatchOrder
 from sqlalchemy.orm import Session
 from entities import *
 from response_model import ResponseModel
@@ -805,7 +806,7 @@ class Staff:
                 message=f"Failed to delete order: {str(e)}"
             )
 
-    def update_order(self, order_id: int, order_update: CreateOrder, db: Session, current_user: dict):
+    def update_order(self, order_id: int, order_update: PatchOrder, db: Session, current_user: dict):
         """Update an existing order"""
         try:
             # Check if order exists
@@ -826,6 +827,22 @@ class Staff:
                     if order_update.address:
                         customer.address = order_update.address
                     if order_update.phone_number:
+                        # Check if new phone number conflicts with another client
+                        existing_phone = db.query(Account).filter(
+                            and_(
+                                Account.phone_number == order_update.phone_number,
+                                Account.cus_id != order.cus_id,
+                                Account.role == 'user'
+                            )
+                        ).first()
+                        
+                        if existing_phone:
+                            return ResponseModel(
+                                code=400,
+                                status="Error",
+                                message=f"Phone number {order_update.phone_number} is already registered to another client"
+                            )
+                        
                         customer.phone_number = order_update.phone_number
                     db.commit()
             

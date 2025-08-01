@@ -68,3 +68,12 @@ class UpdatePawn(BaseModel):
     pawn_date: Optional[date] = None
     pawn_expire_date: Optional[date] = None
     deleteOldProducts: Optional[bool] = False
+
+class PatchOrder(BaseModel):
+    """Model for PATCH operations - all fields optional"""
+    cus_name: Optional[str] = None
+    address: Optional[str] = None
+    phone_number: Optional[str] = None
+    order_date: Optional[date] = None
+    order_deposit: Optional[float] = None
+    order_product_detail: List[BuyProducts] = Field(default_factory=list)

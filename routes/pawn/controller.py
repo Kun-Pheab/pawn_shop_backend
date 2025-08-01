@@ -120,7 +120,7 @@ def delete_pawn(
 @router.patch("/pawn/{pawn_id}", response_model=ResponseModel)
 def update_pawn(
     pawn_id: int,
-    pawn_update: CreatePawn,
+    pawn_update: PatchPawn,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):

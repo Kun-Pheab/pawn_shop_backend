@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 from routes.user.model import *
+from routes.pawn.model import PatchPawn
 from sqlalchemy.orm import Session
 from entities import *
 from response_model import ResponseModel
@@ -572,7 +573,8 @@ class Staff:
         pawns = db.query(
             Pawn.pawn_id,           
             Pawn.pawn_deposit,      
-            Pawn.pawn_date,         
+            Pawn.pawn_date,
+            Pawn.pawn_expire_date,  # Added this line         
             Product.prod_name,
             Product.prod_id,
             PawnDetail.pawn_weight,      
@@ -588,6 +590,7 @@ class Staff:
             "pawn_id": None,
             "pawn_deposit": 0,
             "pawn_date": "",
+            "pawn_expire_date": "",  # Added this line
             "products": [],
         })
 
@@ -598,14 +601,14 @@ class Staff:
                 grouped_pawns[pawn_id]["pawn_id"] = pawn_id
                 grouped_pawns[pawn_id]["pawn_deposit"] = pawn[1]
                 grouped_pawns[pawn_id]["pawn_date"] = pawn[2].strftime("%Y-%m-%d") if pawn[2] else ""
+                grouped_pawns[pawn_id]["pawn_expire_date"] = pawn[3].strftime("%Y-%m-%d") if pawn[3] else ""  # Added this line
 
             product = {
-                "prod_name": pawn[3],
-                "prod_id": pawn[4],
-                "pawn_weight": pawn[5],     
-                "pawn_amount": pawn[6],     
-                "pawn_unit_price": pawn[7], 
-                
+                "prod_name": pawn[4],
+                "prod_id": pawn[5],
+                "pawn_weight": pawn[6],     
+                "pawn_amount": pawn[7],     
+                "pawn_unit_price": pawn[8], 
             }
 
             grouped_pawns[pawn_id]["products"].append(product)
@@ -931,7 +934,7 @@ class Staff:
                 message=f"Failed to delete pawn: {str(e)}"
             )
 
-    def update_pawn(self, pawn_id: int, pawn_update: CreatePawn, db: Session, current_user: dict):
+    def update_pawn(self, pawn_id: int, pawn_update: PatchPawn, db: Session, current_user: dict):
         """Update an existing pawn"""
         try:
             # Check if pawn exists
@@ -952,6 +955,22 @@ class Staff:
                     if pawn_update.address:
                         customer.address = pawn_update.address
                     if pawn_update.phone_number:
+                        # Check if new phone number conflicts with another client
+                        existing_phone = db.query(Account).filter(
+                            and_(
+                                Account.phone_number == pawn_update.phone_number,
+                                Account.cus_id != pawn.cus_id,
+                                Account.role == 'user'
+                            )
+                        ).first()
+                        
+                        if existing_phone:
+                            return ResponseModel(
+                                code=400,
+                                status="Error",
+                                message=f"Phone number {pawn_update.phone_number} is already registered to another client"
+                            )
+                        
                         customer.phone_number = pawn_update.phone_number
                     db.commit()
             
